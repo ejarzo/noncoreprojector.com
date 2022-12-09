@@ -15,13 +15,14 @@ h1 {
   text-shadow: 5px 5px 0 rgba(0, 0, 0, 1);
 }
 
-.video-background {
+#video-background {
   background: black;
   transform: translateX(-80vw) scale(-6);
   width: 100%;
   height: 100%;
   position: fixed;
-  filter: saturate(5) brightness(0.9);
+  /* transition: all 10s; */
+  filter: blur(100px) saturate(5) brightness(0.9);
 }
 
 .content {

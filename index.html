@@ -11,12 +11,9 @@
     <title>NonCoreProjector</title>
   </head>
   <body>
-    <!-- iLHuL3r-Gg0 -- birds -->
-    <!-- mphg2feuAPo -- bears -->
-    <!-- f5NQrjSQI34 -- winter -->
-    <!-- VjvqGR3wsIs -- laramie downtown -->
-    <div class="video-background">
+    <div id="video-background">
       <iframe
+        style="opacity: 0; transition: all 5s"
         id="video-embed"
         width="100%"
         height="100%"
@@ -62,5 +59,22 @@
         </ul>
       </div>
     </div>
+    <script>
+      const ids = [
+        "pT9_HJr-nso",
+        "JQnxefImhu8",
+        "QScTGcafaOo",
+        "khCnS3KC3eY",
+        "zur_B7kw9uM",
+      ];
+      const idx = Math.floor(Math.random() * ids.length);
+      const id = ids[idx];
+      const iframe = document.getElementById("video-embed");
+      const vbg = document.getElementById("video-background");
+      const t = Math.floor(Math.random() * 4000);
+      iframe.src = `https://www.youtube.com/embed/${id}/?start=${t}&controls=0&autoplay=1&mute=1`;
+      iframe.style.opacity = 1;
+      // vbg.style.filter = "blur(0px) saturate(5) brightness(0.9)";
+    </script>
   </body>
 </html>
