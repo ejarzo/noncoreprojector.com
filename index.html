@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <link rel="stylesheet" type="text/css" href="styles.css" />
+    <title>NonCoreProjector</title>
+  </head>
+  <body>
+    <div id="video-background">
+      <iframe
+        style="opacity: 0; transition: all 5s"
+        id="video-embed"
+        width="100%"
+        height="100%"
+        src="https://www.youtube.com/embed/iLHuL3r-Gg0?controls=0&autoplay=1&mute=1"
+        title="YouTube video player"
+        frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen
+      ></iframe>
+    </div>
+    <div class="content">
+      <h1>NonCoreProjector</h1>
+      <div class="details">
+        <p>
+          <em
+            >A <a href="./about.html">collective</a> of artists, technologists
+            and musicians, creating conceptual art installations...</em
+          >
+        </p>
+        <h2>Present</h2>
+        <ul>
+          <li>
+            ☞
+            <a class="block-link" href="/rec-lobe-tv.html"
+              >Rec Lobe TV (2022), Laramie WY</a
+            >
+          </li>
+        </ul>
+        <h2>Past</h2>
+        <ul>
+          <li>
+            ☞
+            <a class="block-link" href="/vec-tor-bel.html"
+              >Vec Tor Bel (2018), Brooklyn, NY</a
+            >
+          </li>
+          <li>
+            ☞
+            <a class="block-link" href="/verbolect.html"
+              >Verbolect (2017), Brooklyn, NY</a
+            >
+          </li>
+        </ul>
+      </div>
+    </div>
+    <script>
+      const ids = [
+        "pT9_HJr-nso",
+        "JQnxefImhu8",
+        "QScTGcafaOo",
+        "khCnS3KC3eY",
+        "zur_B7kw9uM",
+      ];
+      const idx = Math.floor(Math.random() * ids.length);
+      const id = ids[idx];
+      const iframe = document.getElementById("video-embed");
+      const vbg = document.getElementById("video-background");
+      const t = Math.floor(Math.random() * 4000);
+      iframe.src = `https://www.youtube.com/embed/${id}/?start=${t}&controls=0&autoplay=1&mute=1`;
+      iframe.style.opacity = 1;
+      // vbg.style.filter = "blur(0px) saturate(5) brightness(0.9)";
+    </script>
+  </body>
+</html>
