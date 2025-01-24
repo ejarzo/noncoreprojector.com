@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Billionaires Club Wait List</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: black;
+      color: white;
+      text-align: center;
+      padding: 0;
+    }
+
+    h1 {
+      font-size: 10rem;
+      margin-top: 60px;
+	  margin-bottom: 0;
+	  padding: 0;
+	  text-transform: uppercase;
+    }
+	
+	h2 {
+      font-size: 5rem;
+	  margin-top: 0;
+      margin-bottom: 60px;
+	  text-transform: uppercase;
+    }
+	
+    input {
+      padding: 0.5rem;
+      font-size: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    .result {
+      font-size: 2rem;
+      font-weight: bold;
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Billionaires Club</h1>
+  <h2>Wait List</h2>
+  <p>Sorry, the club is all full.</p>
+  <p>But please feel free to fill out your info below and we'll get right back to you with your expected wait time.</p>
+  $ <input type="number" id="salary" placeholder="Enter your yearly salary" />
+  <button onclick="calculateYears()">Calculate</button>
+  <div class="result" id="result"></div>
+  <script>
+    function calculateYears() {
+      const salary = parseFloat(document.getElementById('salary').value);
+
+      if (salary > 0) {
+        if (salary > 1000000000) {
+          document.getElementById('result').innerHTML = 'You greedy bastard! Have we met before?';
+        } else {
+          const yearsToMillionaire = Math.floor(1000000 / salary);
+          const yearsToBillionaire = Math.floor(1000000000 / salary);
+
+        document.getElementById('result').innerHTML = `
+          Thanks for your interest in the Billionaires Club.<br>
+          Your current wait time for the club is <span style="color:#FF0000;">${yearsToBillionaire.toFixed(0)} years</span>.<br>
+		  Feel free to update us if your situation changes.<br>
+		  Goodbye.
+		 
+        `;
+        }
+      } else {
+        document.getElementById('result').innerHTML = 'Please enter a valid yearly salary to see the calculation.';
+      }
+    }
+  </script>
+
+</body>
+</html>
