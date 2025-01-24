@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NonCoreProjector Artist Statement</title>
+    <style>
+        body {
+            font-family: "Courier New", Courier, monospace;
+            background-color: #111;
+            color: #0f0;
+            padding: 40px;
+            max-width: 800px;
+            margin: auto;
+            line-height: 1.8;
+        }
+        .statement {
+            font-size: 1.5em;
+            white-space: pre-wrap;
+            border-right: 3px solid #0f0;
+            animation: blink 0.8s step-end infinite;
+        }
+        @keyframes blink {
+            from, to { border-color: transparent; }
+            50% { border-color: #0f0; }
+        }
+        .highlight {
+            background-color: rgba(255, 255, 0, 0.5);
+            color: black;
+        }
+    </style>
+</head>
+<body>
+    <h1>NonCoreProjector Artist Statement</h1>
+    <p class="statement" id="artistStatement"></p>
+
+    <script>
+        const sentenceStarters = [
+            "Our work",
+            "As artists, we strive to",
+            "Through our art, we explore",
+            "We aim to",
+            "Our creative process involves",
+            "We envision"
+        ];
+
+        const sentences = [
+            " challenge perceptions of reality through abstraction and form.",
+            " explore the intersection of memory, identity, and place.",
+            " create visual narratives that evoke emotional resonance.",
+            " investigate the relationship between structure and spontaneity.",
+            " engage with themes of transformation and impermanence.",
+            " reflect on the impact of time and environment on collective identity.",
+            " strive to capture fleeting moments of human experience.",
+            " seek to push the limits of traditional artistic techniques.",
+            " embrace experimentation as a core part of our practice.",
+            " question the boundaries between art and everyday life.",
+            " envision a future where creativity flourishes and innovation is respected globally.",
+            " believe that now is the golden age of artistic exploration and expression.",
+            " create work that inspires pride, prosperity, and artistic freedom.",
+            " embrace a thrilling new era of creative success, where challenges are transformed into opportunities.",
+            " see a cultural tide sweeping the art world, bringing new energy and fresh perspectives.",
+            " believe we must be honest about the challenges facing artists today and work to overcome them.",
+            " aim to reclaim artistic sovereignty and restore a balance between tradition and progress.",
+            " are confident that the art world stands at the dawn of a new, flourishing era of creative achievement.",
+            " explore the intersections of artificial intelligence and creative expression.",
+            " examine the ways technology mediates our perceptions of self and society.",
+            " embrace video as both a medium and a language for storytelling and critical engagement.",
+            " deconstruct the evolving relationship between humans and intelligent systems.",
+            " investigate how language shapes and distorts our understanding of reality.",
+            " utilize generative algorithms to challenge authorship and artistic intention.",
+            " question the implications of AI-generated content on artistic authenticity.",
+            " engage with the poetic potential of machine learning and linguistic structures.",
+            " reflect on the entanglement of data, meaning, and visual culture.",
+            " explore the limitations and possibilities of language as a system of control and liberation.",
+            " examine how digital media reshapes our collective consciousness and memory."
+        ];
+
+        let statementElement = document.getElementById('artistStatement');
+        let fullStatement = "";
+        let charIndex = 0;
+        let currentSentence = "";
+        let mode = "typing";  // Modes: typing, backspacing, highlighting, revising
+
+        function getRandomSentence() {
+            let starter = sentenceStarters[Math.floor(Math.random() * sentenceStarters.length)];
+            let sentence = sentences[Math.floor(Math.random() * sentences.length)];
+            return starter + sentence;
+        }
+
+        function typeEffect() {
+            let delay = Math.random() * 150 + 50; // Vary typing speed
+
+            if (mode === "typing") {
+                if (charIndex === 0) {
+                    currentSentence = getRandomSentence();
+                    fullStatement += " "; // Add spacing between sentences
+                }
+
+                if (charIndex < currentSentence.length) {
+                    fullStatement += currentSentence.charAt(charIndex);
+                    charIndex++;
+                } else {
+                    charIndex = 0;
+                    mode = Math.random() < 0.3 ? "highlighting" : (Math.random() < 0.6 ? "backspacing" : "revising");
+                }
+            } 
+            else if (mode === "backspacing") {
+                let removeLength = Math.floor(Math.random() * 8) + 3; // Random partial deletion
+                if (fullStatement.length > 20) {
+                    fullStatement = fullStatement.slice(0, -removeLength);
+                    statementElement.innerText = fullStatement;
+                    delay = Math.random() * 100 + 50; // Random backspace speed
+                } else {
+                    mode = "typing";
+                }
+            } 
+            else if (mode === "highlighting") {
+                let words = fullStatement.split(" ");
+                if (words.length > 4) {
+                    let start = Math.floor(Math.random() * (words.length - 2));
+                    let end = Math.min(start + Math.floor(Math.random() * 3) + 1, words.length);
+                    let highlightText = words.slice(start, end).join(" ");
+                    words.splice(start, end - start, `<span class="highlight">${highlightText}</span>`);
+                    statementElement.innerHTML = words.join(" ");
+                    setTimeout(() => {
+                        words.splice(start, 1);  // Remove the highlighted text
+                        fullStatement = words.join(" ").replace(/<[^>]+>/g, '');  // Remove highlight tags
+                        statementElement.innerText = fullStatement;
+                        mode = Math.random() < 0.5 ? "typing" : "backspacing";
+                        typeEffect();
+                    }, Math.random() * 1500 + 500); // Random highlight delay
+                    return;
+                } else {
+                    mode = "typing";
+                }
+            }
+            else if (mode === "revising") {
+                let words = fullStatement.split(" ");
+                if (words.length > 5) {
+                    let replaceIndex = Math.floor(Math.random() * words.length);
+                    words[replaceIndex] = getRandomSentence().split(" ")[2];  // Swap a random word
+                    fullStatement = words.join(" ");
+                }
+                statementElement.innerText = fullStatement;
+                delay = Math.random() * 500 + 200; // Random revision speed
+                mode = "typing";
+            }
+
+            statementElement.innerText = fullStatement;
+            setTimeout(typeEffect, delay);
+        }
+
+        typeEffect();
+    </script>
+</body>
+</html>

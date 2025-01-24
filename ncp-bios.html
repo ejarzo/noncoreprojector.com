@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NonCoreProjector BIO</title>
+    <style>
+        body {
+            font-family: "Courier New", Courier, monospace;
+            background-color: #fff;
+            color: #000;
+            padding: 40px;
+            max-width: 800px;
+            margin: auto;
+            line-height: 1.8;
+        }
+        .statement {
+            font-size: 1.5em;
+            white-space: pre-wrap;
+            border-right: 3px solid #000;
+            animation: blink 0.8s step-end infinite;
+        }
+        @keyframes blink {
+            from, to { border-color: transparent; }
+            50% { border-color: #000; }
+        }
+    </style>
+</head>
+<body>
+    <h1>NonCoreProjector BIO</h1>
+    <p class="statement" id="bioStatement">The collective</p>
+
+    <script>
+        const sentenceParts = [
+            ["NonCoreProjector was formed in 2012", "by visual artists, technologists, and musicians exploring data-driven art."],
+            ["Founded in 2018, NonCoreProjector's members include", "Nat Clisset, John Couillard, Jeremy Clark, Shamus O'Connor, and the AI entity Cleverbot."],
+            ["The collective's notable projects include 'Verbolect,'", "an installation exploring spoken and written language dynamics."],
+            ["NonCoreProjector received the 2021 Digital Innovation Award", "for their work in AI-human symbiosis."],
+            ["We embrace the unpredictable flow of misused technology,", "user comments, and glitches to create evolving art."],
+            ["NonCoreProjector integrates free online resources such as", "WebAPIs, streaming services, and chatbots into their work."],
+            ["Our work examines reciprocal relationships between", "brains, bodies, stimuli, spaces, and machines."],
+            ["Future projects will explore human-machine relationships", "through immersive global installations."],
+            ["The collective's work builds incrementally, akin to a Rube Goldberg machine,", "seeking patterns linking past and present."],
+            ["Silence is a powerful tool in our work,", "countering processed media and embracing diverse acoustics."],
+            ["NonCoreProjector has exhibited internationally", "at Ars Electronica, the Whitney Museum, and the Tate Modern."],
+            ["The group explores video games", "as a medium to challenge perceptions of reality and identity."],
+            ["Our recent digital print series", "questions the boundaries between physical and virtual experiences."],
+            ["NonCoreProjector was awarded the 2023 Technological Creativity Prize", "for their unique approach to AI-human expression."],
+            ["The collective's fictional projects include 'Echo Chamber,'", "an evolving soundscape that reacts to real-time social media sentiment."],
+            ["NonCoreProjector received the Imaginary Futures Grant", "for their speculative project envisioning AI-driven cultural preservation."],
+            ["The collective frequently collaborates with fictional entities", "such as the Global Data Arts Initiative and the Synthetic Reality Lab."],
+            ["Their work has been critiqued in the fictional Journal of Experimental Digital Aesthetics", "for its groundbreaking approach to sensory interaction."]
+        ];
+
+        let statementElement = document.getElementById('bioStatement');
+        let fullStatement = "";
+        let typingIndex = 0;
+        let mode = "typing";  // Modes: typing, backspacing, revising
+        let typingSpeed = () => Math.random() * 150 + 50;
+        let sentenceIndex = 0;
+        let shuffledParts = sentenceParts.sort(() => Math.random() - 0.5).flat();
+
+        function typeEffect() {
+            if (mode === "typing") {
+                if (typingIndex < shuffledParts[sentenceIndex].length) {
+                    fullStatement += shuffledParts[sentenceIndex].charAt(typingIndex);
+                    typingIndex++;
+                } else {
+                    fullStatement += " ";
+                    sentenceIndex = (sentenceIndex + 1) % shuffledParts.length;
+                    typingIndex = 0;
+                    if (Math.random() < 0.5) mode = "revising";
+                }
+            } 
+            else if (mode === "backspacing") {
+                if (fullStatement.length > 10) {
+                    let backspaceAmount = Math.floor(Math.random() * 8 + 2);
+                    fullStatement = fullStatement.slice(0, -backspaceAmount);
+                } else {
+                    mode = "typing";
+                }
+            } 
+            else if (mode === "revising") {
+                let words = fullStatement.split(" ");
+                if (words.length > 4 && Math.random() < 0.6) {
+                    words.splice(Math.floor(Math.random() * words.length), 1);  // Remove a word
+                } else {
+                    let randomIndex = Math.floor(Math.random() * words.length);
+                    words[randomIndex] = shuffledParts[Math.floor(Math.random() * shuffledParts.length)].split(" ")[2];  // Modify a word
+                }
+                fullStatement = words.join(" ");
+                mode = Math.random() < 0.3 ? "backspacing" : "typing";
+            }
+
+            statementElement.innerText = fullStatement;
+            setTimeout(typeEffect, typingSpeed());
+        }
+
+        typeEffect();
+    </script>
+</body>
+</html>
