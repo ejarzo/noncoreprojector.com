@@ -30,7 +30,7 @@ h2 {
   height: 100%;
   position: fixed;
   transition: all 10s;
-  filter: blur(100px) saturate(5) brightness(0.9);
+  filter: none;
 }
 
 .content {
