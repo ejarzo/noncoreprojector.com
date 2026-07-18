@@ -83,37 +83,6 @@
       
     </div>
 
-    <div class="takeover-content hideNav hidden">
-      <div class="container">
-        <div class="row">
-          <div class="col-sm-12 col-md-6">
-            <h2>Vec Tor Bel Takeover</h2>
-            <div class="blurb">
-              This site currently features a full-page takeover of the <strong>Vec Tor Bel</strong> project, as an online 
-              companion to the <a href="" target="_blank">Elastic Minds Show</a> in the South Gallery of Broward College in Fort Lauderdale, FL.
-            </div>
-            <div class="vec-tor-bel-sequence">
-              <p><strong>Vec Tor Bel</strong> is a visual conversation of an AI Chatbot (Cleverbot) with the world, 
-              articulated through the combined lenses of the headline news, the YouTube video and comment ecosystem, and 
-              the emotional dimensions of the AI itself.</p>
-
-              <p>The basic sequence of the piece is as follows:</p>
-              <ul>
-                <li>V. Cleverbot pulls a headline from the morning's news</li>
-                <li>E. searches that phrase on YouTube</li>
-                <li>C. searches that phrase on free sound database</li>
-                <li>T. plays the resulting video</li>
-                <li>O. plays resulting sound</li>
-                <li>R. reads aloud the first comment </li>
-                <li>B. Cleverbot responds to this initial comment</li>
-                <li>E. response input for a subsequent search</li>
-                <li>L. cycle repeats endlessly </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
 
     <div id="main" class="content">
@@ -121,31 +90,8 @@
       
     </div>
     <script>
-      // Safari 3.0+ "[object HTMLElementConstructor]" 
-      const isSafari = /constructor/i.test(window.HTMLElement) || (function (p) { return p.toString() === "[object SafariRemoteNotification]"; })(!window['safari'] || (typeof safari !== 'undefined' && window['safari'].pushNotification));
       const iframe = document.getElementById("video-embed");
-      const vbg = document.getElementById("video-background");
-
-      if (isSafari) {
-        console.log("Safari Browser detected... using backup video")
-        const ids = [
-          "Z13n9Cz8sE4",
-          // "wTQ7U2Bu82U",
-          // "pT9_HJr-nso",
-          // "JQnxefImhu8",
-          // "QScTGcafaOo",
-          // "khCnS3KC3eY",
-          // "zur_B7kw9uM",
-        ];
-        const idx = Math.floor(Math.random() * ids.length);
-        const id = ids[idx];
-        const iframe = document.getElementById("video-embed");
-        const vbg = document.getElementById("video-background");
-        const t = Math.floor(Math.random() * 100);
-        iframe.src = `https://www.youtube.com/embed/${id}/?start=${t}&controls=0&autoplay=1&mute=1`;
-      }
       iframe.style.opacity = 1;
-      vbg.style.filter = "blur(0px) saturate(5) brightness(0.9)";
     </script>
 
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
