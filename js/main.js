@@ -34,4 +34,29 @@
       setOpen(false);
     });
   }
+
+  /**
+     * Inserts a single space into the given string at a random position.
+     * The space is inserted somewhere between the first and last character.
+     *
+     * @param {string} str - The original string.
+     * @returns {string} The string with one randomly inserted space.
+     */
+    function insertOneSpace(str) {
+      // Choose a random position between 1 and (str.length - 1)
+      const pos = Math.floor(Math.random() * (str.length - 1)) + 1;
+      return str.slice(0, pos) + " " + str.slice(pos);
+    }
+
+    /**
+     * Updates the display element with the new string.
+     */
+    function updateDisplay() {
+      const baseString = "NonCoreProjector";
+      const spacedString = insertOneSpace(baseString);
+      document.getElementById("display").textContent = spacedString;
+    }
+
+    updateDisplay();
+    setInterval(updateDisplay, 3000); // Update the display every 3 seconds
 })();
