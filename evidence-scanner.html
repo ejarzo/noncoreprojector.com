@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text to Still Life Transformation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Import Tesseract.js v5 for Improved OCR Accuracy -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime&display=swap');
+
+        :root {
+            --scan-color: #ef4444; /* Default to Red-500 */
+        }
+
+        body {
+            font-family: 'Courier Prime', monospace;
+            background-color: #e5e5e5;
+            color: #111;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            min-height: 600px;
+            overflow: hidden;
+            padding: 20px;
+            transition: background-color 0.5s;
+        }
+
+        /* --- STAGES --- */
+        .stage-container {
+            width: 100%;
+            max-width: 896px; /* 4xl */
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex: 1;
+            min-height: 0;
+            transition: all 0.8s ease;
+        }
+
+        /* --- IMAGE STAGE --- */
+        #image-stage {
+            background: #222;
+            height: 25vh;
+            min-height: 180px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+            transition: all 1s ease;
+            flex-shrink: 0;
+        }
+
+        #evidence-img {
+            max-width: 90%;
+            max-height: 90%;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border: 3px solid #fff;
+            object-fit: contain;
+        }
+
+        .scanning-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--scan-color);
+            box-shadow: 0 0 15px var(--scan-color);
+            opacity: 0;
+            z-index: 10;
+            transition: background 0.5s, box-shadow 0.5s;
+        }
+
+        @keyframes scanLoop {
+            0% { top: 0%; opacity: 0; }
+            5% { opacity: 1; }
+            95% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+
+        /* --- TEXT STAGE --- */
+        #text-container {
+            background: white;
+            padding: 1.5rem;
+            padding-bottom: 80px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+            font-size: 1rem;
+            line-height: 1.6;
+            position: relative;
+            transition: all 0.8s ease;
+            opacity: 0;
+            white-space: pre-wrap;
+            overflow-y: auto;
+        }
+
+        #text-container.visible {
+            opacity: 1;
+        }
+
+        /* Data Stream / Processing Look */
+        #text-container.processing {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #111;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            gap: 4px; 
+            padding: 20px;
+            color: #aaa;
+            transition: color 0.5s;
+        }
+
+        .data-block {
+            font-size: 0.7rem;
+            font-family: 'Courier New', monospace;
+            padding: 4px 6px;
+            border-radius: 2px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(30, 30, 30, 0.8);
+            border: 1px solid #333;
+            animation: slideIn 0.2s ease-out;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            text-transform: uppercase;
+        }
+
+        @keyframes slideIn { 
+            from { opacity: 0; transform: translateY(5px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
+
+        /* --- IMMERSIVE MODE STYLES --- */
+        body.immersive-mode {
+            padding: 0;
+            background-color: white; 
+        }
+
+        body.immersive-mode #controls-bar,
+        body.immersive-mode #image-stage,
+        body.immersive-mode #hud {
+            display: none !important;
+        }
+
+        body.immersive-mode .stage-container {
+            max-width: 100%;
+            height: 100vh;
+            padding: 0;
+            gap: 0;
+        }
+
+        body.immersive-mode #text-container {
+            box-shadow: none;
+            padding: 10vh 15vw; 
+            font-size: 1.6rem; 
+            line-height: 2;
+            border-radius: 0;
+            display: flex; /* Helps with centering if needed */
+            flex-wrap: wrap;
+            align-content: center;
+            justify-content: center;
+        }
+
+        .word {
+            display: inline-block;
+            margin: 0 4px;
+            transition: all 0.5s ease;
+            position: relative;
+            vertical-align: middle;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .whitespace {
+            display: inline;
+            transition: all 1s ease;
+        }
+
+        /* Active Scanner Cursor */
+        .word.scanning {
+            background-color: #bae6fd;
+            border-bottom: 2px solid #0284c7;
+        }
+
+        /* Match Found Highlight - RED TEXT STYLE */
+        .word.highlight {
+            color: #ef4444; 
+            font-weight: bold;
+            transform: scale(1.1);
+            z-index: 10;
+            border-bottom: none;
+            background-color: rgba(239, 68, 68, 0.1);
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+            margin: 10px; /* More space when isolated */
+        }
+
+        /* Condensed Collapse Effect */
+        .faded {
+            opacity: 0;
+            max-width: 0px;
+            font-size: 0px;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden;
+            display: inline-block;
+            vertical-align: bottom;
+            transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Image Transformation */
+        .word.object-mode {
+            color: transparent !important;
+            background-color: transparent !important;
+            box-shadow: none;
+            position: relative;
+            width: auto;
+            min-width: 40px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            animation: popIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform: scale(1.5);
+            margin: 20px 25px; /* Spaced out icons */
+            vertical-align: middle;
+        }
+
+        .word.object-mode::after {
+            content: attr(data-emoji);
+            color: #111;
+            font-size: 4rem; 
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            80% { transform: scale(1.8); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 1; }
+        }
+
+        /* --- HUD --- */
+        #hud {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 320px;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(4px);
+            color: var(--scan-color);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 13px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            z-index: 100;
+            border: 1px solid #333;
+            transition: opacity 0.5s, color 0.5s;
+            opacity: 0;
+        }
+        
+        .hud-row { margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .hud-label { color: #888; }
+        .hud-val { font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <!-- Controls -->
+    <div id="controls-bar" class="w-full max-w-4xl flex justify-between items-center mb-6 p-4 bg-white rounded-lg shadow-sm z-10 sticky top-4 flex-shrink-0">
+        <div>
+            <h1 class="text-xl font-bold text-gray-700">Evidence Scanner v7.1</h1>
+            <p class="text-xs text-gray-500">Condensed Isolation View (10s Delay)</p>
+        </div>
+        <div class="flex gap-2">
+            <!-- File Input Hidden -->
+            <input type="file" id="img-upload" accept="image/*" class="hidden" onchange="handleImageUpload(this)">
+            <button onclick="document.getElementById('img-upload').click()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded transition text-sm">
+                Load Image
+            </button>
+            <button onclick="startSequence()" id="btn-start" class="bg-slate-800 hover:bg-slate-700 text-white px-6 py-2 rounded transition shadow-md">
+                Start Analysis
+            </button>
+            <button onclick="reset()" class="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded transition text-sm">
+                Reset
+            </button>
+        </div>
+    </div>
+
+    <div class="stage-container">
+        <!-- Image Stage -->
+        <div id="image-stage">
+            <div class="scanning-line" id="scan-line"></div>
+            <img id="evidence-img" src="https://placehold.co/600x400/222/555?text=EVIDENCE+FILE\n(Upload+Image)" alt="Evidence" crossorigin="anonymous">
+        </div>
+
+        <!-- Text Stage -->
+        <div id="text-container">
+            <!-- Text injected via JS -->
+        </div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="border-b border-gray-700 pb-2 mb-2 text-xs uppercase tracking-widest text-gray-500">System Status</div>
+        <div class="hud-row">
+            <span class="hud-label">Mode:</span>
+            <span class="hud-val" id="hud-mode">IDLE</span>
+        </div>
+        <div class="hud-row">
+            <span class="hud-label">Confidence:</span>
+            <span class="hud-val" id="hud-conf">--</span>
+        </div>
+        <div class="hud-row">
+            <span class="hud-label">Scanning:</span>
+            <span class="hud-val text-white truncate max-w-[150px] text-right" id="hud-word">---</span>
+        </div>
+        <div class="hud-row">
+            <span class="hud-label">Objects Found:</span>
+            <span class="hud-val" id="hud-count">0</span>
+        </div>
+        <div id="hud-log" class="mt-2 text-xs text-gray-400 font-mono h-24 overflow-hidden border-t border-gray-800 pt-2 flex flex-col-reverse">
+            <!-- Logs go here -->
+            <div>> System ready.</div>
+        </div>
+    </div>
+
+    <script>
+        // 1. Expanded Database
+        const objectDatabase = {
+            "money": "💵", "cash": "💵", "dollar": "💵", "dollars": "💵", "coin": "🪙", "wallet": "👛", "purse": "👜", "credit": "💳", "card": "💳", "gold": "💰", "jewelry": "💍", "ring": "💍", "necklace": "📿", "diamond": "💎", "$200": "💵",
+            "gun": "🔫", "pistol": "🔫", "weapon": "🔫", "knife": "🔪", "blade": "🔪", "sword": "⚔️", "blood": "🩸", "drug": "💊", "pill": "💊", "bomb": "💣", "poison": "🧪", "handcuff": "🔗", "chain": "⛓️",
+            "phone": "📱", "cellphone": "📱", "mobile": "📱", "computer": "💻", "laptop": "💻", "screen": "🖥️", "monitor": "🖥️", "keyboard": "⌨️", "mouse": "🖱️", "camera": "📷", "video": "📹", "tv": "📺", "radio": "📻", "battery": "🔋", "disk": "💾", "cd": "💿", "cable": "🔌", "plug": "🔌", "printer": "🖨️",
+            "paper": "📄", "document": "📄", "file": "📁", "folder": "📁", "book": "📖", "notebook": "📓", "pen": "🖊️", "pencil": "✏️", "marker": "🖍️", "envelope": "✉️", "letter": "✉️", "box": "📦", "tape": "📼", "clipboard": "📋", "calendar": "📅", "chart": "📊", "map": "🗺️", "scissors": "✂️", "trash": "🗑️", "bin": "🗑️",
+            "car": "🚗", "automobile": "🚗", "taxi": "🚕", "cab": "🚕", "police": "🚓", "truck": "🚚", "van": "🚐", "bus": "🚌", "bike": "🚲", "bicycle": "🚲", "motorcycle": "🏍️", "scooter": "🛵", "train": "🚆", "plane": "✈️", "airplane": "✈️", "boat": "🚤", "ship": "🚢", "key": "🔑", "keys": "🔑", "ticket": "🎫", "wheel": "🛞", "tire": "🛞", "road": "🛣️",
+            "house": "🏠", "home": "🏠", "building": "🏢", "office": "🏢", "school": "🏫", "hospital": "🏥", "bank": "🏦", "hotel": "🏨", "room": "🚪", "door": "🚪", "window": "🪟", "floor": "🟫", "wall": "🧱", "table": "🪑", "desk": "🪑", "chair": "🪑", "seat": "💺", "bed": "🛏️", "couch": "🛋️", "sofa": "🛋️", "lamp": "💡", "light": "💡", "mirror": "🪞", "toilet": "🚽", "bath": "🛁", "shower": "🚿",
+            "shirt": "👕", "t-shirt": "👕", "pants": "👖", "jeans": "👖", "shoe": "👞", "shoes": "👞", "sneaker": "👟", "boot": "🥾", "sock": "🧦", "hat": "🧢", "cap": "🧢", "coat": "🧥", "jacket": "🧥", "dress": "👗", "skirt": "👗", "glasses": "👓", "sunglasses": "🕶️", "tie": "👔", "glove": "🧤", "scarf": "🧣", "bag": "🎒", "backpack": "🎒", "suitcase": "🧳", "mask": "😷", "umbrella": "☂️",
+            "food": "🍱", "breakfast": "🍳", "lunch": "🍔", "dinner": "🍽️", "water": "💧", "drink": "🥤", "bottle": "🍾", "cup": "☕", "mug": "☕", "coffee": "☕", "tea": "🍵", "beer": "🍺", "wine": "🍷", "alcohol": "🥃", "glass": "🥃", "bread": "🍞", "meat": "🥩", "fruit": "🍎", "apple": "🍎", "banana": "🍌", "egg": "🥚", "pizza": "🍕", "cake": "🍰", "candy": "🍬", "chocolate": "🍫", "ice": "🧊",
+            "knife": "🔪", "spoon": "🥄", "fork": "🍴", "plate": "🍽️", "dish": "🍽️", "bowl": "🥣", "pan": "🍳", "pot": "🍲", "hammer": "🔨", "wrench": "🔧", "screwdriver": "🪛", "tool": "🛠️", "gear": "⚙️", "bucket": "🪣", "broom": "🧹", "lock": "🔒",
+            "sun": "☀️", "moon": "🌙", "star": "⭐", "cloud": "☁️", "rain": "🌧️", "snow": "❄️", "fire": "🔥", "tree": "🌳", "flower": "🌸", "rose": "🌹", "plant": "🪴", "leaf": "🍃", "rock": "🪨", "stone": "🪨", "sand": "🏖️", "water": "💧", "sea": "🌊", "ocean": "🌊", "mountain": "⛰️",
+            "person": "👤", "man": "👨", "woman": "👩", "child": "👶", "baby": "👶", "face": "😀", "hand": "✋", "eye": "👁️", "ear": "👂", "foot": "🦶", "heart": "❤️", "brain": "🧠", "skull": "💀", "police": "👮", "cop": "👮", "doctor": "👨‍⚕️", "nurse": "👩‍⚕️",
+            "time": "⌚", "clock": "🕰️", "watch": "⌚", "gift": "🎁", "present": "🎁", "balloon": "🎈", "ball": "⚽", "game": "🎮", "toy": "🧸", "music": "🎵", "guitar": "🎸", "piano": "🎹", "mic": "🎤", "microphone": "🎤", "camera": "📷", "picture": "🖼️", "photo": "🖼️", "art": "🎨", "cigarette": "🚬", "smoke": "💨", "shopping": "🛍️", "massage": "🧴", "oil": "🧴"
+        };
+
+        // Helper: Smart Matching
+        function getObjectMatch(text) {
+            const clean = text.toLowerCase().replace(/[.,?;"'()!]/g, '');
+            if (!clean || clean.length < 2) return null;
+
+            if (objectDatabase[clean]) return { name: clean.toUpperCase(), emoji: objectDatabase[clean] };
+
+            if (clean.endsWith('s') && objectDatabase[clean.slice(0, -1)]) {
+                const singular = clean.slice(0, -1);
+                return { name: singular.toUpperCase(), emoji: objectDatabase[singular] };
+            }
+
+            if (clean.endsWith('es') && objectDatabase[clean.slice(0, -2)]) {
+                const singular = clean.slice(0, -2);
+                return { name: singular.toUpperCase(), emoji: objectDatabase[singular] };
+            }
+
+            return null;
+        }
+
+        let currentText = `
+        Mr. Epstein's house that day, and that they were going to go shopping after she got her money, and that [REDACTED] could make some money. 
+        Q During that ride, did [REDACTED] realize that [REDACTED] received money from Mr. Epstein? 
+        A Yes. At some point [REDACTED] knows that [REDACTED] received $200, but is unsure that [REDACTED] ever gave a massage. So at that particular time [REDACTED] did not know why she had gotten the $200, because she didn't think that [REDACTED] had had time to give a massage. 
+        `;
+
+        // DOM Elements
+        const textContainer = document.getElementById('text-container');
+        const imageStage = document.getElementById('image-stage');
+        const evidenceImg = document.getElementById('evidence-img');
+        const scanLine = document.getElementById('scan-line');
+        const hud = document.getElementById('hud');
+        const hudMode = document.getElementById('hud-mode');
+        const hudConf = document.getElementById('hud-conf');
+        const hudWord = document.getElementById('hud-word');
+        const hudCount = document.getElementById('hud-count');
+        const hudLog = document.getElementById('hud-log');
+        const controlsBar = document.getElementById('controls-bar');
+
+        let isRunning = false;
+        let objectCounter = 0;
+        let isCustomImage = false;
+        let streamInterval = null;
+
+        // --- Audio System ---
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+        function playMatchSound() {
+            if (!audioCtx) return;
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.1);
+            gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.1);
+        }
+
+        function setColor(color) {
+            document.documentElement.style.setProperty('--scan-color', color);
+        }
+
+        // --- Pixel Data Sampler ---
+        function startDataStream() {
+            textContainer.classList.add('processing');
+            textContainer.classList.add('visible');
+            textContainer.innerHTML = '';
+            
+            // Try to set up canvas for pixel reading
+            let ctx = null;
+            let width = 0;
+            let height = 0;
+            
+            try {
+                const canvas = document.createElement('canvas');
+                // Use natural dims to get real data
+                canvas.width = evidenceImg.naturalWidth || evidenceImg.width;
+                canvas.height = evidenceImg.naturalHeight || evidenceImg.height;
+                
+                // If it's 0 (image not loaded fully), fallback
+                if(canvas.width === 0) throw new Error("Image not ready");
+
+                // Limit resolution for performance if massive
+                if(canvas.width > 500) {
+                     const scale = 500 / canvas.width;
+                     canvas.width = 500;
+                     canvas.height = canvas.height * scale;
+                }
+                
+                ctx = canvas.getContext('2d', { willReadFrequently: true });
+                ctx.drawImage(evidenceImg, 0, 0, canvas.width, canvas.height);
+                width = canvas.width;
+                height = canvas.height;
+            } catch(e) {
+                console.warn("Pixel Read Error (CORS or Empty):", e);
+                ctx = null;
+            }
+
+            // Function to generate a block
+            const addBlock = () => {
+                const span = document.createElement('div');
+                span.className = 'data-block';
+                
+                let hex = '#333';
+                let textColor = '#fff';
+                let content = '';
+
+                if (ctx) {
+                    // Sample random pixel
+                    const x = Math.floor(Math.random() * width);
+                    const y = Math.floor(Math.random() * height);
+                    try {
+                        const p = ctx.getImageData(x, y, 1, 1).data;
+                        // RGB to Hex
+                        hex = "#" + ((1 << 24) + (p[0] << 16) + (p[1] << 8) + p[2]).toString(16).slice(1).toUpperCase();
+                        
+                        // Calculate brightness for text contrast
+                        const brightness = (p[0] * 299 + p[1] * 587 + p[2] * 114) / 1000;
+                        textColor = brightness > 125 ? '#000' : '#fff';
+                        
+                        content = `<span style="opacity:0.6; font-size:0.6rem;">PX:${x},${y}</span> <span style="font-weight:bold;">${hex}</span>`;
+                    } catch (e) {
+                         hex = '#EF4444'; // Error Red
+                         content = `ERR:SECURE`;
+                    }
+                } else {
+                    // Fallback Simulation (If CORS blocked)
+                    const r = Math.floor(Math.random() * 255);
+                    const g = Math.floor(Math.random() * 255);
+                    const b = Math.floor(Math.random() * 255);
+                    hex = "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
+                    content = `SIM:${hex}`;
+                }
+
+                span.style.backgroundColor = hex;
+                span.style.color = textColor;
+                span.style.borderColor = hex; // Solid color block look
+                span.innerHTML = content;
+                
+                textContainer.appendChild(span);
+                
+                // Auto scroll
+                textContainer.scrollTop = textContainer.scrollHeight;
+            };
+
+            // Initial burst
+            for(let i=0; i<30; i++) addBlock();
+
+            // Continuous stream
+            streamInterval = setInterval(() => {
+                // Keep buffer size manageable
+                if(textContainer.children.length > 150) {
+                    textContainer.removeChild(textContainer.firstChild);
+                }
+                addBlock();
+                addBlock(); // Double speed
+            }, 60);
+        }
+
+        function stopDataStream() {
+            clearInterval(streamInterval);
+            textContainer.classList.remove('processing');
+            textContainer.innerHTML = ''; // Clear for real text
+        }
+
+        // --- Initialization ---
+        function renderText(textToRender) {
+            textContainer.innerHTML = '';
+            // Split by words but preserve whitespace structure 
+            // This is crucial for initial readability and later collapsing
+            const words = textToRender.split(/(\s+)/);
+            
+            words.forEach(fragment => {
+                const span = document.createElement('span');
+                span.textContent = fragment;
+                
+                // Check if fragment is whitespace
+                if (!fragment.trim()) {
+                    span.className = 'whitespace'; 
+                } else {
+                    span.className = 'word';
+                    
+                    const match = getObjectMatch(fragment);
+                    
+                    if (match) {
+                        span.dataset.isObject = "true";
+                        span.dataset.emoji = match.emoji;
+                        span.dataset.objName = match.name;
+                    }
+                }
+                textContainer.appendChild(span);
+            });
+        }
+
+        // --- Image Handling ---
+        function handleImageUpload(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    evidenceImg.src = e.target.result;
+                    isCustomImage = true;
+                    
+                    // Soft Reset
+                    document.body.classList.remove('immersive-mode');
+                    setColor('#ef4444'); // Back to Red
+                    textContainer.classList.remove('visible');
+                    textContainer.classList.remove('processing');
+                    clearInterval(streamInterval);
+                    
+                    textContainer.innerHTML = ''; 
+                    objectCounter = 0;
+                    hudCount.textContent = "0";
+                    hudWord.textContent = "---";
+                    hudConf.textContent = "--";
+                    hudMode.textContent = "READY";
+                    
+                    log("----------------");
+                    log("> New evidence loaded.");
+                }
+                reader.readAsDataURL(input.files[0]);
+                input.value = ''; 
+            }
+        }
+
+        // --- Sequence Logic ---
+        async function startSequence() {
+            if (isRunning) return;
+            
+            initAudio();
+            isRunning = true;
+            document.getElementById('btn-start').disabled = true;
+            document.getElementById('btn-start').classList.add('opacity-50');
+
+            // 1. Fresh Analysis Start
+            objectCounter = 0;
+            hudCount.textContent = "0";
+            hud.style.opacity = 1;
+            setMode("INITIALIZING");
+            setColor('#ef4444'); // RED for Scanning
+
+            if(textContainer.classList.contains('visible')) {
+                textContainer.classList.remove('visible');
+                await wait(500);
+            }
+            
+            // 2. OCR Phase & Data Stream
+            scanLine.style.animation = "scanLoop 4s linear infinite";
+            scanLine.style.opacity = 1;
+            setMode("EXTRACTING PIXELS");
+            
+            // Start the REAL Pixel Sampler
+            startDataStream();
+            
+            const minTimePromise = wait(4000);
+            let ocrPromise;
+
+            if (isCustomImage) {
+                 log("> Analyzing image content...");
+                 ocrPromise = Tesseract.recognize(
+                     evidenceImg.src,
+                     'eng',
+                     { 
+                         logger: m => {
+                             if(m.status === 'recognizing text') {
+                                hudConf.textContent = Math.floor(m.progress * 100) + "%";
+                             }
+                         }
+                     }
+                 ).then(result => {
+                     log("> Text layer isolated.");
+                     currentText = result.data.text;
+                     hudConf.textContent = Math.floor(result.data.confidence) + "%";
+                 }).catch(err => {
+                     log("> Error: " + err);
+                 });
+            } else {
+                log("> Simulating extraction...");
+                ocrPromise = wait(1000); // Dummy wait
+                hudConf.textContent = "100%";
+            }
+            
+            await Promise.all([minTimePromise, ocrPromise]);
+
+            // SWITCH TO BLUE when done with extraction
+            setColor('#3b82f6'); // Blue-500
+            setMode("DATA SECURE");
+            log("> Pattern matched.");
+            await wait(800);
+
+            // --- ACTIVATE IMMERSIVE MODE ---
+            // Hides controls, image, and HUD. Makes text window full screen.
+            document.body.classList.add('immersive-mode');
+
+            stopDataStream();
+            scanLine.style.animation = "none";
+            scanLine.style.opacity = 0;
+
+            // 3. Render Text ("Resolve" effect)
+            setMode("DECRYPTING");
+            log("> Decrypting transcript...");
+            
+            renderText(currentText);
+            textContainer.classList.add('visible'); 
+            // Ensure full-screen text is scrolled to top/center nicely
+            textContainer.scrollTop = 0; 
+
+            await wait(1500);
+
+            // 4. Analyze Text
+            // Switch Color back to RED for "Alert/Find" mode
+            setColor('#ef4444');
+            setMode("ANALYZING");
+            log("> Detecting objects...");
+            
+            // Re-query only .word elements to scan them
+            const spans = document.querySelectorAll('.word');
+            
+            for (let i = 0; i < spans.length; i++) {
+                const span = spans[i];
+                
+                span.classList.add('scanning');
+                hudWord.textContent = span.textContent;
+
+                let speed = 40; 
+                
+                if (span.dataset.isObject === "true") {
+                    await wait(300); 
+                    playMatchSound();
+                    span.classList.add('highlight'); // Turns Red
+                    span.classList.remove('scanning');
+                    objectCounter++;
+                    hudCount.textContent = objectCounter;
+                    log(`> MATCH: ${span.dataset.objName}`);
+                    
+                    hudWord.style.color = "#ef4444";
+                    await wait(150);
+                    hudWord.style.color = "var(--scan-color)"; 
+                } else {
+                    await wait(speed); 
+                    span.classList.remove('scanning');
+                }
+            }
+
+            // 5. Fade Out & COLLAPSE (Condensed View)
+            setMode("ISOLATING");
+            log("> Removing noise...");
+            await wait(1000);
+            
+            const allChildren = textContainer.children;
+            Array.from(allChildren).forEach(child => {
+                // If it's a whitespace span or a non-object word, collapse it
+                if (child.classList.contains('whitespace') || (child.classList.contains('word') && child.dataset.isObject !== "true")) {
+                    child.classList.add('faded');
+                }
+            });
+
+            // *** 10 SECOND PAUSE WITH CONDENSED RED TEXT ***
+            log("> Isolating targets (10s)...");
+            await wait(10000);
+
+            // 6. Transform
+            setMode("RENDERING");
+            log("> Reconstructing scene...");
+            
+            const objects = document.querySelectorAll('.word[data-is-object="true"]');
+            objects.forEach((span, idx) => {
+                setTimeout(() => {
+                    span.classList.remove('highlight');
+                    span.classList.add('object-mode');
+                }, idx * 250); 
+            });
+
+            await wait(objects.length * 250 + 500);
+            setMode("COMPLETE");
+            log("> Process finished.");
+            
+            isRunning = false;
+            document.getElementById('btn-start').disabled = false;
+            document.getElementById('btn-start').classList.remove('opacity-50');
+        }
+
+        // --- Helpers ---
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function setMode(text) {
+            hudMode.textContent = text;
+            if(text === "ANALYZING") hudMode.style.color = "#bae6fd";
+            else if(text === "COMPLETE") hudMode.style.color = "#fde047";
+            else hudMode.style.color = "var(--scan-color)";
+        }
+
+        function log(msg) {
+            const line = document.createElement('div');
+            line.textContent = msg;
+            hudLog.prepend(line);
+        }
+
+        function reset() {
+            location.reload(); 
+        }
+
+        // Initial Render
+        renderText(currentText);
+
+    </script>
+</body>
+</html>
