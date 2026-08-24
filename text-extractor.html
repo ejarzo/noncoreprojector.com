@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reddit Text Phase Extractor</title>
+    
+    <!-- Changed from VT323 to Roboto -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #fcfcfc; /* Very close to pure white */
+            --panel-bg: #f4f4f4; /* Very light gray panel */
+            --header-bg: #d4d4d4; /* Darker grey header */
+            --light-red-bg: #fff0f0; /* Very light, pale red */
+            --accent: #ff0000; /* Pure saturated red */
+            --secondary: #0044ff; /* Pure saturated blue */
+            --tertiary: #ffea00; /* Pure saturated yellow */
+            --text-main: #000000; /* Pure black text */
+            --text-muted: #666666; /* Medium gray */
+            --border: #cccccc; /* Neutral gray borders */
+            --highlight-bg: var(--tertiary);
+            --highlight-text: #000000;
+            --green-ink: #00aa00; /* Pure saturated green */
+            --orange-ink: #ff5500; /* Pure saturated orange */
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0; background: var(--bg-color); color: var(--text-main);
+            font-family: 'Roboto', sans-serif; /* Clean, modern font for Phase 1 */
+            font-size: 1rem; 
+            display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+        }
+
+        /* === HEADER === */
+        header {
+            padding: 15px 20px; background: var(--header-bg); color: var(--text-main);
+            border-bottom: 2px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center; font-size: 1rem;
+            letter-spacing: 1px; text-transform: uppercase; font-weight: normal;
+        }
+        .header-group { display: flex; align-items: center; gap: 15px; }
+
+        /* Speed Control Styles */
+        .speed-control {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 0.85rem; background: #ffffff; padding: 2px 8px; /* Shrunk padding and text size */
+            border: 2px solid var(--text-main);
+        }
+        .speed-control input[type=range] {
+            accent-color: var(--accent); cursor: pointer; width: 80px; /* Shrunk slider width */
+        }
+
+        /* Target Input Styles */
+        .target-control {
+            display: flex; align-items: center; gap: 5px;
+        }
+        .target-input {
+            font-family: 'Roboto', sans-serif;
+            font-size: 1rem;
+            background: #ffffff;
+            border: 2px solid var(--text-main);
+            color: var(--text-main);
+            padding: 2px 6px;
+            width: 120px;
+            text-transform: lowercase;
+            outline: none;
+        }
+        .target-input:focus {
+            border-color: var(--secondary);
+            background: #f0f8ff;
+        }
+
+        .status-pulse {
+            display: inline-block; width: 10px; height: 10px; 
+            background: var(--accent); border-radius: 50%;
+            border: none;
+            margin-right: 8px; 
+            animation: pulse 6s infinite; /* Slowed down pulse even more */
+        }
+
+        /* === WORKSPACE === */
+        #workspace { display: flex; flex: 1; overflow: hidden; }
+
+        /* === LEFT PANEL (THE SCANNER) === */
+        #left-panel {
+            width: 40%; min-width: 400px; border-right: 2px solid var(--border);
+            display: flex; flex-direction: column; background: var(--panel-bg);
+        }
+
+        #active-scanner {
+            padding: 30px; border-bottom: 2px solid var(--border);
+            min-height: 150px; background: var(--light-red-bg); position: relative;
+        }
+        
+        .scanner-label {
+            font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;
+            font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+            font-family: 'Roboto', sans-serif; 
+        }
+
+        .metadata-box {
+            font-size: 0.85rem; color: var(--secondary);
+            margin-bottom: 20px; padding: 10px;
+            background: #ffffff;
+            border: 2px dashed var(--secondary);
+            font-weight: normal;
+        }
+
+        /* The individual letters in the source text */
+        .source-char {
+            display: inline-block; 
+            font-family: 'Courier New', Courier, monospace; /* Highly legible typewriter font */
+            font-size: 1.4rem; /* Reduced from 1.8rem for better fit */
+            transition: all 0.2s ease;
+            font-weight: bold;
+        }
+        .source-char.active-highlight {
+            color: var(--highlight-text); background: var(--highlight-bg);
+            transform: scale(1.1); z-index: 10; font-weight: bold;
+            border: 2px solid var(--text-main);
+            box-shadow: 3px 3px 0px rgba(0,0,0,0.15);
+        }
+        
+        /* New logic applied via JS classes */
+        .source-char.dimmed { opacity: 0.75; }
+        .source-char.dimmed.vowel { color: var(--orange-ink); }
+        .source-char.dimmed.consonant { color: var(--green-ink); }
+        .source-char.dimmed.other { color: var(--text-muted); opacity: 0.4; }
+
+        #history-log {
+            flex: 1; padding: 20px; overflow-y: auto;
+            color: var(--text-muted);
+        }
+        .history-item { 
+            margin-bottom: 15px; border-left: 3px solid var(--accent); padding-left: 10px; 
+            transition: all 0.3s ease; 
+            font-family: 'Courier New', Courier, monospace; /* Highly legible typewriter font */
+            font-size: 1rem; /* Reduced from 1.2rem */
+            font-weight: bold;
+        }
+
+        /* === RIGHT PANEL (THE DOCUMENT) === */
+        #right-panel {
+            flex: 1; padding: 40px; overflow-y: auto; 
+            background: var(--bg-color);
+            background-image: 
+                linear-gradient(var(--border) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 40px 40px; /* Rigid grid cell size */
+            background-position: 0 0;
+        }
+
+        .doc-header { 
+            color: var(--accent); margin-bottom: 40px; font-weight: bold; 
+            background: var(--bg-color); display: inline-block; padding-right: 10px;
+        }
+
+        #doc-output {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, 40px);
+            grid-auto-rows: 40px;
+            grid-auto-flow: dense; /* The "Tetris" packing magic */
+            gap: 0;
+        }
+
+        .bridge-token {
+            display: flex; align-items: center; justify-content: center;
+            background: #ffffff; border: 2px solid #000000; /* Hard Jensen-style borders */
+            font-weight: bold; transition: all 0.4s;
+            box-shadow: inset -4px -4px 0px rgba(0,0,0,0.15); /* Thicker 3D Block effect */
+            box-sizing: border-box; overflow: hidden;
+            text-align: center; gap: 2px;
+            font-size: 1.1rem;
+            padding: 2px;
+        }
+
+        /* The decoding state */
+        .bridge-token.decoding {
+            border-color: var(--accent); color: var(--accent);
+            background: #f7e6e3; z-index: 2;
+        }
+
+        /* The final locked state */
+        .bridge-token.locked {
+            color: var(--text-main);
+            /* Borders and backgrounds applied dynamically in JS */
+        }
+
+        .letter-node { color: inherit; }
+        
+        .rand-node { 
+            color: var(--bg-color); font-size: 1rem; 
+            background: var(--secondary); padding: 2px 4px; 
+            border: 1px solid var(--text-main);
+            margin: 0 2px;
+        }
+
+        /* === INTERMISSION SCREEN 1 (RAW TEXT) === */
+        #intermission-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #ffffff; color: #000000; 
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 1.2rem; line-height: 1.8; padding: 10vw;
+            display: none; z-index: 1000; overflow-y: auto;
+            white-space: pre-wrap; /* Preserves the random spacing */
+            text-align: justify;
+        }
+
+        /* === INTERMISSION SCREEN 2 (NARRATIVE STORY) === */
+        #story-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #ffffff; color: #5e3a19; /* White paper, Sepia text */
+            font-family: 'Georgia', 'Times New Roman', serif; /* Legible literary font */
+            font-style: italic; /* Poetic slant */
+            font-size: 1.4rem; line-height: 1.8; padding: 10vw;
+            display: none; z-index: 2000; overflow-y: auto;
+            text-align: center; /* Center the poetry block */
+        }
+
+        #story-content {
+            display: inline-block;
+            text-align: left; /* Left align the lines of the poem */
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .story-title {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            font-style: normal;
+            color: #5e3a19; font-size: 1.2rem; margin-bottom: 3rem;
+            font-weight: bold; letter-spacing: 2px;
+            border-bottom: 1px solid #ecdac4;
+            padding-bottom: 10px;
+            text-transform: uppercase;
+            text-align: center;
+        }
+
+        /* Blending the synthesized words into the poetic aesthetic */
+        .story-word-highlight { color: #8c3123; font-weight: bold; font-style: normal; }
+        .story-num-highlight { color: #315273; font-weight: bold; font-style: normal; }
+
+        .type-cursor {
+            color: #8c3123;
+            animation: blink 1s step-end infinite;
+            font-weight: bold;
+        }
+
+        /* Animations */
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-group">
+            <div><span class="status-pulse"></span> SYSTEM: TEXT PHASE EXTRACTOR ACTIVE</div>
+            <div id="feed-status" style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">CONNECTING...</div>
+        </div>
+        
+        <!-- Speed Slider, Mute Toggle, and Download Button -->
+        <div class="speed-control">
+            <label for="speed-slider">SPEED:</label>
+            <input type="range" id="speed-slider" min="0.25" max="4" step="0.25" value="1">
+            <span id="speed-display" style="min-width: 35px;">1.0x</span>
+            <button id="mute-btn" style="margin-left: 10px; background: #fff; border: 1px solid var(--text-main); color: var(--text-main); padding: 2px 8px; cursor: pointer; font-family: inherit; font-size: inherit; font-weight: bold;">SOUND: ON</button>
+            <button id="download-btn" style="margin-left: 10px; background: #fff; border: 1px solid var(--text-main); color: var(--accent); padding: 2px 8px; cursor: pointer; font-family: inherit; font-size: inherit; font-weight: bold;">SAVE LOG</button>
+        </div>
+
+        <!-- Dynamic Target Input -->
+        <div class="header-group target-control">
+            <label for="target-input">TARGET: r/</label>
+            <input type="text" id="target-input" class="target-input" value="science" spellcheck="false" autocomplete="off">
+        </div>
+    </header>
+
+    <div id="workspace">
+        <div id="left-panel">
+            <div id="active-scanner">
+                <div class="scanner-label">// CURRENT THREAD</div>
+                <div id="thread-metadata" class="metadata-box" style="display: none;"></div>
+                <div id="scanner-text">Waiting for data stream...</div>
+            </div>
+            <div id="history-log">
+                <div class="scanner-label">// PROCESSED ARCHIVE</div>
+            </div>
+        </div>
+        
+        <div id="right-panel">
+            <div class="doc-header">// EXTRACTED BRIDGE MATRICES [L1 - NUM - L2]</div>
+            <div id="doc-output"></div>
+        </div>
+    </div>
+
+    <!-- The Raw Text Screen -->
+    <div id="intermission-screen"></div>
+
+    <!-- The Final Narrative Screen -->
+    <div id="story-screen">
+        <div class="story-title">// NARRATIVE SYNTHESIS //</div>
+        <div id="story-content"></div>
+    </div>
+
+    <script>
+        let speedMultiplier = 1;
+        let isMuted = false;
+        
+        // This variable stores all the generated data and poetry over the session
+        let sessionLog = "=== REDDIT TEXT PHASE EXTRACTOR: SESSION LOG ===\n\n";
+
+        const BASE_CONFIG = {
+            target: "science",
+            scanSpeed: 400,      // Base scan speed
+            decodeTime: 2400,    // Base decoding time
+            nextPostDelay: 6000, // Base delay between posts
+            postsPerCycle: 4,    // How many threads to read before the white screen
+            intermissionTime: 30000 // Increased to 30 seconds
+        };
+
+        // Utility to scale delays dynamically based on the slider
+        const getSpeed = (ms) => ms / speedMultiplier;
+
+        const STATE = { 
+            queue: [], 
+            isProcessing: false,
+            postsProcessed: 0,
+            extractedTokens: [], // Stores the raw string data
+            lastRawText: "" // Stores the assembled paragraph for logging
+        };
+
+        // --- UI BINDINGS ---
+        document.getElementById('speed-slider').addEventListener('input', (e) => {
+            speedMultiplier = parseFloat(e.target.value);
+            document.getElementById('speed-display').innerText = speedMultiplier.toFixed(1) + 'x';
+        });
+
+        document.getElementById('mute-btn').addEventListener('click', (e) => {
+            isMuted = !isMuted;
+            e.target.innerText = isMuted ? "SOUND: OFF" : "SOUND: ON";
+            e.target.style.color = isMuted ? "var(--text-muted)" : "var(--text-main)";
+            
+            // Instantly cut off speech if currently talking
+            if (isMuted) {
+                window.speechSynthesis.cancel();
+            }
+        });
+
+        // Event listener to download the running log
+        document.getElementById('download-btn').addEventListener('click', () => {
+            let downloadContent = sessionLog;
+            
+            // Add any data that is currently being processed before the cycle finishes
+            if (STATE.extractedTokens.length > 0) {
+                downloadContent += `--- CURRENT ACTIVE CYCLE (INCOMPLETE) ---\n`;
+                downloadContent += `TARGET: r/${BASE_CONFIG.target}\n\n`;
+                downloadContent += `[RAW DATA EXTRACTED SO FAR]\n`;
+                let tempRaw = "";
+                STATE.extractedTokens.forEach(token => {
+                    tempRaw += token + "   ";
+                });
+                downloadContent += tempRaw.trim() + "\n\n";
+                downloadContent += `=================================================\n\n`;
+            }
+
+            // If absolutely nothing has happened yet, add a note
+            if (STATE.extractedTokens.length === 0 && STATE.postsProcessed === 0 && sessionLog.indexOf("EXTRACTION CYCLE") === -1) {
+                downloadContent += "(No data extracted yet. Wait for the scanner to process a few words!)\n";
+            }
+
+            const blob = new Blob([downloadContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `extractor_log_${new Date().getTime()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        document.getElementById('target-input').addEventListener('change', (e) => {
+            // Clean up the input (remove spaces and special chars, Reddit subs are alphanumeric + underscores)
+            let newTarget = e.target.value.trim().replace(/[^a-zA-Z0-9_]/g, '');
+            if (newTarget) {
+                BASE_CONFIG.target = newTarget;
+                e.target.value = newTarget; // Update the UI to show the cleaned input
+                STATE.queue = []; // Empty the current queue so it immediately fetches the new target
+                document.getElementById('feed-status').innerText = "[ SWITCHING DATA STREAM... ]";
+                document.getElementById('feed-status').style.color = "var(--text-muted)";
+            } else {
+                e.target.value = BASE_CONFIG.target; // Revert to old value if they left it blank
+            }
+        });
+
+        // --- THE SYNTHESIS DICTIONARY ---
+        // A curated list of atmospheric words to construct our story from.
+        const DICTIONARY = [
+            "anomaly", "abstract", "algorithm", "beyond", "binary", "bridge", "cause", "cellular", "code", "dark", "digital", "data",
+            "effect", "energy", "entity", "force", "future", "form", "gravity", "ghost", "grid", "human", "hyper", "host",
+            "illusion", "infinite", "iteration", "joint", "journey", "jump", "kinetic", "knowing", "key", "limit", "logic", "loop",
+            "matter", "memory", "matrix", "nature", "neural", "node", "object", "origin", "orbit", "pattern", "phase", "pulse",
+            "quantum", "query", "reason", "reality", "sequence", "space", "system", "time", "truth", "trace",
+            "universe", "unknown", "unit", "vision", "void", "vertex", "wave", "world", "wire", "xeno", "xyloid",
+            "year", "yield", "zero", "zone"
+        ];
+
+        // Utility to handle asynchronous pauses
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        // Typewriter effect that respects HTML tags and simulates human typing
+        async function typeWriterHTML(element, html, baseSpeed = 40) {
+            element.innerHTML = '';
+            
+            // Tokenize HTML to safely separate tags, entities, and actual text
+            const tokens = [];
+            let idx = 0;
+            while (idx < html.length) {
+                if (html[idx] === '<') {
+                    let tag = '';
+                    while (idx < html.length && html[idx] !== '>') {
+                        tag += html[idx];
+                        idx++;
+                    }
+                    tag += '>';
+                    tokens.push({ type: 'tag', char: tag });
+                    idx++;
+                } else if (html[idx] === '&') {
+                    let entity = '';
+                    while (idx < html.length && html[idx] !== ';') {
+                        entity += html[idx];
+                        idx++;
+                    }
+                    entity += ';';
+                    tokens.push({ type: 'char', char: entity });
+                    idx++;
+                } else {
+                    tokens.push({ type: 'char', char: html[idx] });
+                    idx++;
+                }
+            }
+
+            let rendered = [];
+            const keyboardKeys = "abcdefghijklmnopqrstuvwxyz";
+
+            for (let i = 0; i < tokens.length; i++) {
+                let token = tokens[i];
+                
+                if (token.type === 'tag') {
+                    rendered.push(token.char);
+                    element.innerHTML = rendered.join('') + "<span class='type-cursor'>_</span>";
+                    
+                    // Simulate thinking pauses for structural tags (like stanza breaks)
+                    if (token.char.includes('margin-top: 3rem')) {
+                        await sleep(getSpeed(1500)); // Pondering next stanza
+                    } else if (token.char === '<div>') {
+                        await sleep(getSpeed(400)); // Carriage return pause
+                    }
+                    continue;
+                }
+                
+                // --- NATURAL TYPING SIMULATION ---
+                
+                // 1. Chance to make a typo (only on letters)
+                let isMistake = Math.random() < 0.04 && token.char.length === 1 && /[a-z]/i.test(token.char);
+                if (isMistake) {
+                    let wrongChar = keyboardKeys[Math.floor(Math.random() * keyboardKeys.length)];
+                    rendered.push(wrongChar);
+                    element.innerHTML = rendered.join('') + "<span class='type-cursor'>_</span>";
+                    await sleep(getSpeed(Math.random() * 80 + 60)); // Hit wrong key
+                    
+                    // Pause (realizing mistake)
+                    await sleep(getSpeed(Math.random() * 300 + 200));
+                    
+                    // Backspace
+                    rendered.pop();
+                    element.innerHTML = rendered.join('') + "<span class='type-cursor'>_</span>";
+                    await sleep(getSpeed(Math.random() * 100 + 50));
+                }
+                
+                // 2. Type the correct character
+                rendered.push(token.char);
+                element.innerHTML = rendered.join('') + "<span class='type-cursor'>_</span>";
+                
+                // 3. Calculate delay for the next keystroke
+                let delay = (Math.random() * baseSpeed + baseSpeed / 2);
+                
+                if (token.char === '&nbsp;') {
+                    delay = Math.random() * 20 + 10; // Rapid spacebar tapping to indent
+                } else {
+                    // Added semi-colons and em-dashes to the dramatic pause list
+                    if (['.', ',', '!', '?', ';', '—'].includes(token.char)) {
+                        delay += 600; // Deep pause at punctuation
+                    }
+                    if (token.char === ' ' && Math.random() < 0.15) {
+                        delay += 300; // Thinking pause between words
+                    }
+                }
+                
+                // Keep auto-scroll active while typing
+                const storyScreen = document.getElementById('story-screen');
+                storyScreen.scrollTop = storyScreen.scrollHeight;
+
+                await sleep(getSpeed(delay));
+            }
+            
+            // Leave cursor blinking at the end of the poem
+            element.innerHTML = rendered.join('') + "<span class='type-cursor'>_</span>";
+        }
+
+        // Generate synthetic data in case Reddit API rate-limits us
+        const syntheticData = [
+            { title: "The universe is expanding at an accelerating rate.", author: "u/astro_bot", pubDate: new Date().toISOString() },
+            { title: "Quantum entanglement allows particles to communicate instantly.", author: "u/physics_fan", pubDate: new Date().toISOString() },
+            { title: "Artificial intelligence models are analyzing the text perfectly.", author: "u/ai_researcher", pubDate: new Date().toISOString() },
+            { title: "Deep sea exploration revealed strange new bioluminescent creatures.", author: "u/ocean_explorer", pubDate: new Date().toISOString() },
+            { title: "The architectural design of the bridge withstood the earthquake.", author: "u/civil_eng", pubDate: new Date().toISOString() }
+        ];
+
+        async function fetchReddit() {
+            const cb = Math.random();
+            const url = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(`https://www.reddit.com/r/${BASE_CONFIG.target}/new.rss?cb=${cb}`)}`;
+            const statusEl = document.getElementById('feed-status');
+            
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.items && data.items.length > 0) {
+                    STATE.queue.push(...data.items);
+                    statusEl.innerText = "[ LIVE REDDIT FEED ]";
+                    statusEl.style.color = "var(--green-ink)";
+                } else {
+                    throw new Error("Empty data");
+                }
+            } catch (e) { 
+                console.log("API limit reached, using synthetic data feed.");
+                STATE.queue.push(...syntheticData);
+                statusEl.innerText = "[ SYNTHETIC BACKUP ]";
+                statusEl.style.color = "var(--orange-ink)";
+            }
+
+            if (!STATE.isProcessing) processNext();
+        }
+
+        async function processNext() {
+            if (STATE.queue.length === 0) {
+                STATE.isProcessing = false;
+                fetchReddit(); // Refill queue
+                return;
+            }
+
+            STATE.isProcessing = true;
+            const post = STATE.queue.shift();
+            
+            await performVisualAnalysis(post);
+
+            // Move to history
+            const history = document.getElementById('history-log');
+            const histItem = document.createElement('div');
+            histItem.className = 'history-item';
+            histItem.innerText = post.title;
+            history.prepend(histItem);
+
+            // Keep history short
+            if(history.children.length > 10) history.lastChild.remove();
+
+            // Check if we have processed enough for a paragraph
+            STATE.postsProcessed++;
+            if (STATE.postsProcessed >= BASE_CONFIG.postsPerCycle) {
+                await triggerIntermission();
+                return; 
+            }
+
+            await sleep(getSpeed(BASE_CONFIG.nextPostDelay));
+            processNext();
+        }
+
+        // Expanded logic to turn random letters into a dictionary word
+        function expandLettersToWord(letters) {
+            let str = letters.toLowerCase();
+            
+            // 1. Try to find a word that starts with the exact letter group (e.g., "th" -> "theory")
+            let matches = DICTIONARY.filter(w => w.startsWith(str));
+            if (matches.length > 0) return matches[Math.floor(Math.random() * matches.length)];
+            
+            // 2. If no exact match, try matching just the first letter
+            matches = DICTIONARY.filter(w => w.startsWith(str[0]));
+            if (matches.length > 0) return matches[Math.floor(Math.random() * matches.length)];
+            
+            // 3. Absolute fallback: just append a weird sci-fi suffix to it
+            return str + "ium"; 
+        }
+
+        // Convert numbers to written words (0-99)
+        function numberToWords(numStr) {
+            const units = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", 
+                           "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+            const tens = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+            
+            let n = parseInt(numStr, 10);
+            if (isNaN(n)) return numStr;
+            if (n < 20) return units[n];
+            if (n < 100) {
+                let t = Math.floor(n / 10);
+                let u = n % 10;
+                return tens[t] + (u > 0 ? "-" + units[u] : "");
+            }
+            if (n < 1000) {
+                let h = Math.floor(n / 100);
+                let rem = n % 100;
+                if (rem === 0) return units[h] + " hundred";
+                return units[h] + " hundred and " + numberToWords(rem.toString());
+            }
+            return numStr; // Fallback
+        }
+
+        async function triggerIntermission() {
+            const screen = document.getElementById('intermission-screen');
+            
+            // --- STAGE 1: RAW ARIAL TEXT ---
+            let paragraphText = "";
+            STATE.extractedTokens.forEach(token => {
+                // Generate between 0 and 3 random spaces to inject between tokens
+                const spacesCount = Math.floor(Math.random() * 4);
+                const spaces = " ".repeat(spacesCount);
+                paragraphText += token + spaces;
+            });
+
+            STATE.lastRawText = paragraphText.trim();
+            screen.innerText = STATE.lastRawText;
+            screen.style.display = 'block';
+
+            // Wait for the configured time dynamically scaled
+            await sleep(getSpeed(BASE_CONFIG.intermissionTime));
+            screen.style.display = 'none';
+
+            // --- STAGE 2: NARRATIVE SYNTHESIS ---
+            triggerStoryScreen();
+        }
+
+        // Helper to generate a random future date (1 to 500 years from now)
+        function generateFutureDate() {
+            const currentYear = new Date().getFullYear();
+            const futureYear = currentYear + Math.floor(Math.random() * 500) + 1;
+            const month = String(Math.floor(Math.random() * 12) + 1).padStart(2, '0');
+            const day = String(Math.floor(Math.random() * 28) + 1).padStart(2, '0');
+            return `${futureYear}.${month}.${day}`;
+        }
+
+        async function triggerStoryScreen() {
+            const storyScreen = document.getElementById('story-screen');
+            const storyContent = document.getElementById('story-content');
+            
+            // Four distinct prophetic/Nostradamus styles with unique voice profiles and title generators
+            const poetryStyles = [
+                {
+                    titlePrefixes: ["ASYMPTOTIC", "RECURSIVE", "STOCHASTIC", "INDETERMINATE", "FORMLESS", "LIMINAL"],
+                    titleSuffixes: ["ESOTERIC", "SILENT", "ABSTRACT", "FRACTURED", "ECHOING"],
+                    conjunction: "",
+                    pitch: 0.7,  // Monotone
+                    rate: 0.85,  // Slow, deliberate
+                    templates: [
+                        "The <span class='story-word-highlight'>{L}</span> shall interface<br>with <span class='story-num-highlight'>{N}</span> shards of <span class='story-word-highlight'>{R}</span>.",
+                        "When <span class='story-num-highlight'>{N}</span> <span class='story-word-highlight'>{L}</span>s align,<br>will the <span class='story-word-highlight'>{R}</span> shift irreversibly?",
+                        "Beyond the <span class='story-word-highlight'>{L}</span>...<br>what will we find among <span class='story-num-highlight'>{N}</span> fragments of <span class='story-word-highlight'>{R}</span>?",
+                        "If <span class='story-word-highlight'>{L}</span> decays into <span class='story-word-highlight'>{R}</span>,<br>the <span class='story-num-highlight'>{N}</span> will soon follow.",
+                        "Whispers of the <span class='story-word-highlight'>{L}</span><br>echo through <span class='story-num-highlight'>{N}</span> iterations of <span class='story-word-highlight'>{R}</span>—",
+                        "Is that a solitary <span class='story-word-highlight'>{L}</span> approaching <span class='story-word-highlight'>{R}</span>,<br>harbinger of <span class='story-num-highlight'>{N}</span> unseen ages?",
+                        "Between the <span class='story-word-highlight'>{L}</span> and the <span class='story-word-highlight'>{R}</span>;<br>a silence of <span class='story-num-highlight'>{N}</span> heartbeats..."
+                    ]
+                },
+                {
+                    titlePrefixes: ["OMINOUSLY DARK", "CATACLYSMIC", "MALIGNANT", "DREAD-INDUCING", "TERMINAL", "INESCAPABLE"],
+                    titleSuffixes: ["SPASMODIC", "RUINOUS", "ABYSSAL", "BLOOD-STAINED", "SHATTERING"],
+                    conjunction: " AND ",
+                    pitch: 0.1,  // Deep, Demonic/Ominous
+                    rate: 0.65,  // Very slow and drawn out
+                    templates: [
+                        "Beware the <span class='story-word-highlight'>{L}</span>.<br>It brings <span class='story-num-highlight'>{N}</span> plagues of <span class='story-word-highlight'>{R}</span>.",
+                        "In the shadow of the <span class='story-word-highlight'>{L}</span>,<br>must <span class='story-num-highlight'>{N}</span> <span class='story-word-highlight'>{R}</span>s perish?",
+                        "The blood of the <span class='story-word-highlight'>{L}</span><br>will drown <span class='story-num-highlight'>{N}</span> kingdoms of <span class='story-word-highlight'>{R}</span>.",
+                        "When the <span class='story-word-highlight'>{L}</span> awakens,<br>will <span class='story-num-highlight'>{N}</span> cries for <span class='story-word-highlight'>{R}</span> go unanswered?",
+                        "A cursed <span class='story-word-highlight'>{L}</span> will rise,<br>consuming exactly <span class='story-num-highlight'>{N}</span> souls of <span class='story-word-highlight'>{R}</span>!",
+                        "Why trade <span class='story-num-highlight'>{N}</span> lifetimes of <span class='story-word-highlight'>{L}</span><br>just to escape the <span class='story-word-highlight'>{R}</span>?",
+                        "Subtracting <span class='story-num-highlight'>{N}</span> from the <span class='story-word-highlight'>{L}</span><br>inevitably leaves a corpse of <span class='story-word-highlight'>{R}</span>..."
+                    ]
+                },
+                {
+                    titlePrefixes: ["DRACONIAN", "HEGEMONIC", "IMPERIOUS", "ORTHODOX", "SOVEREIGN", "BUREAUCRATIC"],
+                    titleSuffixes: ["INSTITUTIONAL", "TYRANNICAL", "DOGMATIC", "DECREED", "UNRELENTING"],
+                    conjunction: " ",
+                    pitch: 1.1,  // Assertive, Regal
+                    rate: 0.95,  // Confident, normal speech pace
+                    templates: [
+                        "The emperor of <span class='story-word-highlight'>{L}</span><br>must be overthrown by <span class='story-num-highlight'>{N}</span> sects of <span class='story-word-highlight'>{R}</span>.",
+                        "When the council decrees the <span class='story-word-highlight'>{L}</span>,<br>will <span class='story-num-highlight'>{N}</span> nations burn for <span class='story-word-highlight'>{R}</span>?",
+                        "The republic of <span class='story-word-highlight'>{L}</span> will fracture;<br>divided into <span class='story-num-highlight'>{N}</span> states of <span class='story-word-highlight'>{R}</span>.",
+                        "Can a tyrant bearing the mark of <span class='story-word-highlight'>{L}</span><br>subjugate <span class='story-num-highlight'>{N}</span> generations of <span class='story-word-highlight'>{R}</span>?",
+                        "In the year of the <span class='story-word-highlight'>{L}</span>,<br><span class='story-num-highlight'>{N}</span> laws of <span class='story-word-highlight'>{R}</span> shall be rewritten in ash.",
+                        "Will the mobs demand the <span class='story-word-highlight'>{L}</span>,<br>sacrificing <span class='story-num-highlight'>{N}</span> leaders to the <span class='story-word-highlight'>{R}</span>?",
+                        "Let <span class='story-word-highlight'>{L}</span> be the crown—<br>and let <span class='story-num-highlight'>{N}</span> be the guillotine of <span class='story-word-highlight'>{R}</span>!"
+                    ]
+                },
+                {
+                    titlePrefixes: ["ABSURDIST", "RIDICULOUSLY INCONVENIENT", "MILDLY ANNOYING", "STRUCTURALLY UNSOUND", "DEEPLY UNSERIOUS"],
+                    titleSuffixes: ["NON-COMPULSORY", "PERPLEXING", "BAFFLING", "SIDEWAYS", "AWKWARD"],
+                    conjunction: " ",
+                    pitch: 1.8,  // High-pitched, frantic
+                    rate: 1.15,  // Fast, slightly panicky
+                    templates: [
+                        "The great <span class='story-word-highlight'>{L}</span> shall arrive,<br>wearing <span class='story-num-highlight'>{N}</span> oversized <span class='story-word-highlight'>{R}</span>s.",
+                        "Beware the prophecy of the <span class='story-word-highlight'>{L}</span>.<br>Will it slightly inconvenience <span class='story-num-highlight'>{N}</span> <span class='story-word-highlight'>{R}</span>s?",
+                        "When the <span class='story-word-highlight'>{L}</span> sneezes,<br>why do <span class='story-num-highlight'>{N}</span> <span class='story-word-highlight'>{R}</span>s mysteriously turn to cheese?",
+                        "The heavens will part for the <span class='story-word-highlight'>{L}</span>,<br>revealing <span class='story-num-highlight'>{N}</span> mildly confused <span class='story-word-highlight'>{R}</span>s...",
+                        "Why will a flock of <span class='story-word-highlight'>{L}</span>s descend,<br>demanding exactly <span class='story-num-highlight'>{N}</span> refunds for the <span class='story-word-highlight'>{R}</span>?",
+                        "Do not mistake the <span class='story-word-highlight'>{L}</span> for <span class='story-word-highlight'>{R}</span>;<br>one is a deity, the other owes me <span class='story-num-highlight'>{N}</span> dollars!",
+                        "Did we measure <span class='story-num-highlight'>{N}</span> frequencies of <span class='story-word-highlight'>{R}</span>,<br>only to find a very lost <span class='story-word-highlight'>{L}</span>?"
+                    ]
+                }
+            ];
+
+            // Randomly select one cohesive style for this cycle
+            const activeStyle = poetryStyles[Math.floor(Math.random() * poetryStyles.length)];
+            const templates = activeStyle.templates;
+            
+            // Build the complex, elaborate title and a random future date
+            const prefix = activeStyle.titlePrefixes[Math.floor(Math.random() * activeStyle.titlePrefixes.length)];
+            const suffix = activeStyle.titleSuffixes[Math.floor(Math.random() * activeStyle.titleSuffixes.length)];
+            const generatedTitle = `// ${prefix}${activeStyle.conjunction}${suffix} PREMONITION //`;
+            const futureDateStr = `[ TARGET EVENT: ${generateFutureDate()} ]`;
+            
+            // Update the title on the screen with the new structure
+            document.querySelector('.story-title').innerHTML = `${generatedTitle}<br><span style="font-size: 0.85rem; letter-spacing: 4px; color: #8c3123;">${futureDateStr}</span>`;
+
+            let storyText = "";
+            let lineCount = 0;
+
+            STATE.extractedTokens.forEach(token => {
+                // Break the token back into parts: letters - numbers - letters
+                const match = token.match(/([a-zA-Z]+)(\d+)([a-zA-Z]+)/);
+                if (match) {
+                    const lWord = expandLettersToWord(match[1]);
+                    const numWords = numberToWords(match[2]); // Convert digits to spelled out words
+                    const rWord = expandLettersToWord(match[3]);
+                    
+                    let tmpl = templates[Math.floor(Math.random() * templates.length)];
+                    tmpl = tmpl.replace(/{L}/g, lWord).replace(/{R}/g, rWord).replace(/{N}/g, numWords);
+                    
+                    // --- POETRY FORMATTING ---
+                    // Decide if this is a new stanza (creates a larger vertical gap)
+                    const isNewStanza = (lineCount > 0 && Math.random() > 0.6);
+                    const topMargin = isNewStanza ? "3rem" : "0.8rem";
+                    
+                    let formattedBlock = `<div style="margin-top: ${topMargin};">`;
+                    
+                    // Split the template by <br> to apply varying horizontal indents to each line
+                    let lines = tmpl.split('<br>');
+                    lines.forEach((line) => {
+                        const spaceCount = Math.floor(Math.random() * 15); // Random indent up to 15 spaces
+                        const indentSpaces = "&nbsp;".repeat(spaceCount); // Using non-breaking spaces so they are actually "typed" out
+                        formattedBlock += `<div>${indentSpaces}${line}</div>`;
+                    });
+                    
+                    formattedBlock += `</div>`;
+                    storyText += formattedBlock;
+                    lineCount++;
+                }
+            });
+            
+            // --- SAVE TO MASTER LOG ---
+            // Carefully strip the HTML to preserve the stanza indents and line breaks for the text file
+            const plainPoem = storyText
+                .replace(/<div style="margin-top: 3rem;">/g, '\n\n') // Render large stanzas breaks
+                .replace(/<div[^>]*>/g, '') // Strip remaining opening divs
+                .replace(/<\/div>/g, '\n')  // Replace closing divs with newlines
+                .replace(/&nbsp;/g, ' ')    // Bring back the physical spaces
+                .replace(/<[^>]+>/g, '')    // Strip any remaining spans/tags
+                .trim();
+                
+            sessionLog += `--- EXTRACTION CYCLE [${new Date().toLocaleString()}] ---\n`;
+            sessionLog += `TARGET: r/${BASE_CONFIG.target}\n`;
+            sessionLog += `TYPE: ${generatedTitle.replace(/\//g, '').trim()}\n`;
+            sessionLog += `DATE: ${futureDateStr.replace(/[\[\]]/g, '').trim()}\n\n`;
+            sessionLog += `[RAW DATA]\n${STATE.lastRawText}\n\n`;
+            sessionLog += `[SYNTHESIS]\n${plainPoem}\n\n`;
+            sessionLog += `=================================================\n\n`;
+
+            storyContent.innerHTML = ''; // Ensure it starts completely empty
+            storyScreen.style.display = 'block';
+
+            // Start the typewriter effect
+            await typeWriterHTML(storyContent, storyText, 50);
+
+            // Pause to show the whole poem
+            await sleep(getSpeed(4000));
+
+            // Setup Text-to-Speech
+            // Strip HTML tags and entities so the engine only reads the words
+            const plainText = storyText.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+            const utterance = new SpeechSynthesisUtterance(plainText);
+            
+            // Apply the specific voice parameters for the active style
+            utterance.rate = activeStyle.rate;
+            utterance.pitch = activeStyle.pitch;
+            
+            // Attempt to assign a distinctly different voice profile (e.g., Male vs Female, UK vs US) if the browser supports it
+            const voices = window.speechSynthesis.getVoices();
+            const engVoices = voices.filter(v => v.lang.includes('en'));
+            if (engVoices.length > 0) {
+                // Lock a specific voice index to the specific style to guarantee they sound different
+                const styleIndex = poetryStyles.indexOf(activeStyle);
+                utterance.voice = engVoices[styleIndex % engVoices.length];
+            }
+            
+            // Speak the poem aloud (only if not muted)
+            if (!isMuted) {
+                window.speechSynthesis.speak(utterance);
+            }
+
+            // Immediately reset and start the visualizer again while the voice is reading
+            storyScreen.style.display = 'none';
+            document.getElementById('doc-output').innerHTML = '';
+            document.getElementById('history-log').innerHTML = '<div class="scanner-label">// PROCESSED ARCHIVE</div>';
+            document.getElementById('scanner-text').innerHTML = 'Waiting for data stream...';
+            document.getElementById('thread-metadata').style.display = 'none';
+
+            STATE.postsProcessed = 0;
+            STATE.extractedTokens = [];
+
+            // Trigger the next cycle
+            processNext();
+        }
+
+        async function performVisualAnalysis(post) {
+            const scanner = document.getElementById('scanner-text');
+            const metadataBox = document.getElementById('thread-metadata');
+            
+            // Fix Reddit's UTC date formatting issue safely across browsers
+            let dateStr = "Unknown Date";
+            if (post.pubDate) {
+                // rss2json usually returns 'YYYY-MM-DD HH:MM:SS', replace space with T for valid ISO8601
+                let safeDateStr = post.pubDate.replace(' ', 'T'); 
+                if (!safeDateStr.endsWith('Z') && !safeDateStr.includes('+')) {
+                    safeDateStr += 'Z'; // Force browser to interpret as UTC
+                }
+                const dateObj = new Date(safeDateStr);
+                if (!isNaN(dateObj.getTime())) {
+                    dateStr = dateObj.toLocaleString();
+                } else {
+                    dateStr = post.pubDate; // Fallback to raw string if parsing fails
+                }
+            }
+            
+            const authorStr = post.author || "Anonymous";
+            const sourceStr = "r/" + BASE_CONFIG.target;
+            
+            metadataBox.innerHTML = `SOURCE: ${sourceStr}<br>AUTHOR: ${authorStr}<br>DATE:   ${dateStr}`;
+            metadataBox.style.display = 'block'; // Re-enable visibility!
+            
+            scanner.innerHTML = ''; // Clear previous
+
+            // Clean the text and break it into individual DOM elements (spans)
+            const text = post.title;
+            const cleanText = text.trim();
+            const charElements = [];
+
+            for (let i = 0; i < cleanText.length; i++) {
+                const char = cleanText[i];
+                const span = document.createElement('span');
+                span.className = 'source-char';
+                
+                // Assign Vowel / Consonant classes
+                if (/[aeiouy]/i.test(char)) {
+                    span.classList.add('vowel');
+                } else if (/[a-z]/i.test(char)) {
+                    span.classList.add('consonant');
+                } else {
+                    span.classList.add('other');
+                }
+
+                span.innerText = char === ' ' ? '\u00A0' : char; // Use non-breaking space for layout
+                scanner.appendChild(span);
+                charElements.push({ char: char, el: span });
+            }
+
+            // The Scanning Loop
+            for (let i = 0; i < charElements.length; i++) {
+                // Dim all previous characters to create a "scanning head" effect
+                if (i > 0) charElements[i-1].el.classList.add('dimmed');
+                
+                // If we hit a space
+                if (charElements[i].char === ' ' && i > 0 && i < charElements.length - 1) {
+                    
+                    // Count how many characters belong to the left word
+                    let leftWordLen = 0;
+                    let lIdx = i - 1;
+                    while (lIdx >= 0 && charElements[lIdx].char !== ' ') {
+                        leftWordLen++;
+                        lIdx--;
+                    }
+
+                    // Count how many characters belong to the right word
+                    let rightWordLen = 0;
+                    let rIdx = i + 1;
+                    while (rIdx < charElements.length && charElements[rIdx].char !== ' ') {
+                        rightWordLen++;
+                        rIdx++;
+                    }
+
+                    // Only proceed if both sides have valid word characters
+                    if (leftWordLen > 0 && rightWordLen > 0) {
+                        
+                        // Randomly choose how many letters to take (1 to 4, constrained by word length)
+                        const takeLeft = Math.min(leftWordLen, Math.floor(Math.random() * 4) + 1);
+                        const takeRight = Math.min(rightWordLen, Math.floor(Math.random() * 4) + 1);
+
+                        const leftHighlights = [];
+                        const rightHighlights = [];
+                        let strLeft = "";
+                        let strRight = "";
+
+                        // 1. HIGHLIGHT SOURCE LETTERS
+                        for (let k = i - takeLeft; k < i; k++) {
+                            charElements[k].el.classList.remove('dimmed');
+                            charElements[k].el.classList.add('active-highlight');
+                            leftHighlights.push(charElements[k].el);
+                            strLeft += charElements[k].char;
+                        }
+
+                        for (let k = i + 1; k <= i + takeRight; k++) {
+                            charElements[k].el.classList.add('active-highlight');
+                            rightHighlights.push(charElements[k].el);
+                            strRight += charElements[k].char;
+                        }
+
+                        // 2. TRIGGER TARGET DECODING IN NEW DOC
+                        await spawnAndDecodeToken(strLeft, strRight);
+
+                        // 3. REMOVE HIGHLIGHT
+                        leftHighlights.forEach(el => el.classList.remove('active-highlight'));
+                        rightHighlights.forEach(el => el.classList.remove('active-highlight'));
+                    }
+                }
+                
+                await sleep(getSpeed(BASE_CONFIG.scanSpeed));
+            }
+        }
+
+        // Calculate the alphabetical sum of a string (A=1, B=2, ... Z=26)
+        function calculateAlphaSum(str) {
+            let sum = 0;
+            const upperStr = str.toUpperCase();
+            for (let i = 0; i < upperStr.length; i++) {
+                const charCode = upperStr.charCodeAt(i);
+                if (charCode >= 65 && charCode <= 90) { // Check if it is a letter A-Z
+                    sum += (charCode - 64);
+                }
+            }
+            return sum > 0 ? sum : 1; // Fallback to 1 if no valid letters found
+        }
+
+        async function spawnAndDecodeToken(str1, str2) {
+            const doc = document.getElementById('doc-output');
+            const token = document.createElement('div');
+            token.className = 'bridge-token decoding';
+            
+            // Randomly determine the "Tetris Shape" of the block
+            const typeRoll = Math.random();
+            let spanCols = 1, spanRows = 1;
+            
+            if (typeRoll < 0.2) {
+                // Vertical Block (1x2)
+                spanCols = 1; spanRows = 2;
+                token.style.flexDirection = 'column';
+            } else if (typeRoll < 0.4) {
+                // Square Block (2x2)
+                spanCols = 2; spanRows = 2;
+                token.style.flexDirection = 'column';
+            } else {
+                // Horizontal Block (Variable width based on text)
+                const totalChars = str1.length + str2.length + 2;
+                spanCols = Math.min(6, Math.max(2, Math.ceil((totalChars * 18) / 40)));
+                spanRows = 1;
+                token.style.flexDirection = 'row';
+            }
+
+            token.style.gridColumn = `span ${spanCols}`;
+            token.style.gridRow = `span ${spanRows}`;
+
+            doc.appendChild(token);
+
+            // Auto scroll right panel
+            const rightPanel = document.getElementById('right-panel');
+            rightPanel.scrollTop = rightPanel.scrollHeight;
+
+            // The number is now the true alphabetical sum of the extracted letters
+            const finalNum = calculateAlphaSum(str1) + calculateAlphaSum(str2);
+            const startTime = Date.now();
+            const currentDecodeTime = getSpeed(BASE_CONFIG.decodeTime);
+
+            // Alfred Jensen Inspired Palette (Secondary & Tertiary colors, opaque and saturated)
+            const lockColors = [
+                { bg: '#FF6600', text: '#000000' }, // Orange
+                { bg: '#9900FF', text: '#FFFFFF' }, // Purple
+                { bg: '#00CC66', text: '#000000' }, // Teal / Blue-Green
+                { bg: '#FFCC00', text: '#000000' }, // Yellow-Orange
+                { bg: '#FF0066', text: '#FFFFFF' }, // Magenta / Red-Purple
+                { bg: '#99CC00', text: '#000000' }, // Yellow-Green
+                { bg: '#FF3300', text: '#FFFFFF' }  // Red-Orange
+            ];
+
+            // Helper to scramble text blocks
+            const scrambleText = (len) => {
+                let res = '';
+                for(let i=0; i<len; i++) res += String.fromCharCode(97 + Math.floor(Math.random() * 26));
+                return res;
+            };
+
+            // The "Slot Machine" Decoding Effect
+            return new Promise(resolve => {
+                const interval = setInterval(() => {
+                    const elapsed = Date.now() - startTime;
+                    
+                    // Scramble letters and numbers based on multi-character strings
+                    const tempStr1 = elapsed > currentDecodeTime * 0.5 ? str1 : scrambleText(str1.length);
+                    const tempStr2 = elapsed > currentDecodeTime * 0.8 ? str2 : scrambleText(str2.length);
+                    const tempNum = Math.floor(Math.random() * 99);
+
+                    token.innerHTML = `<span class="letter-node">${tempStr1}</span><span class="rand-node" style="color: inherit; background: rgba(255,255,255,0.3); border-color: inherit;">${tempNum.toString().padStart(2, '0')}</span><span class="letter-node">${tempStr2}</span>`;
+
+                    if (elapsed >= currentDecodeTime) {
+                        clearInterval(interval);
+                        
+                        // Lock in final visual result
+                        const finalNumStr = finalNum.toString().padStart(2, '0');
+                        token.innerHTML = `<span class="letter-node">${str1}</span><span class="rand-node" style="color: inherit; background: rgba(255,255,255,0.3); border-color: inherit;">${finalNumStr}</span><span class="letter-node">${str2}</span>`;
+                        token.className = 'bridge-token locked';
+                        
+                        // Apply random color from Jensen palette
+                        const theme = lockColors[Math.floor(Math.random() * lockColors.length)];
+                        token.style.backgroundColor = theme.bg;
+                        token.style.color = theme.text;
+                        
+                        // Save the raw text equivalent for the intermission screen
+                        STATE.extractedTokens.push(`${str1}${finalNumStr}${str2}`);
+                        
+                        resolve();
+                    }
+                }, getSpeed(160)); // dynamically scale the frame rate of the scramble
+            });
+        }
+
+        // Boot system
+        setTimeout(fetchReddit, 1000);
+
+    </script>
+</body>
+</html>
