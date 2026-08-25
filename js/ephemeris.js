@@ -1,4 +1,4 @@
-/* Constellation — particles.js driven by live data.
+/* Ephemeris — particles.js driven by live data.
  *
  * Points are not random: each one is placed by a real event. The field builds
  * to a randomly chosen density, holds, collapses, and begins again — so the

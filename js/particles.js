@@ -9,7 +9,7 @@
 /* NCP-MODIFIED (not stock v2.0.0):
 /*   - added pJS.fn.vendors.clickMatrix(): a setInterval that fires synthetic
 /*     clicks to self-fill the field. Now gated on interactivity.onclick.enable
-/*     so it stays off when constellation.js is driving placement itself.
+/*     so it stays off when ephemeris.js is driving placement itself.
 /*   - silenced the debug console.log calls (they fired 20x/sec under clickMatrix)
 /* ----------------------------------------------- */
 
@@ -1448,7 +1448,7 @@ var pJS = function(tag_id, params){
       pJS.fn.particlesCreate();
       pJS.fn.vendors.densityAutoParticles();
       /* NCP: the synthetic-click filler only makes sense when click interaction
-         is enabled; constellation.js turns it off and places points from data. */
+         is enabled; ephemeris.js turns it off and places points from data. */
       if(pJS.interactivity.events.onclick.enable){
         pJS.fn.vendors.clickMatrix();
       }
